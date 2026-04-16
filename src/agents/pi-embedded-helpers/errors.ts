@@ -341,16 +341,25 @@ function isHtmlErrorResponse(raw: string, status?: number): boolean {
   if (!trimmed) {
     return false;
   }
-  const candidate = extractLeadingHttpStatus(trimmed) ? trimmed : stripErrorPrefix(trimmed);
+  const leading = extractLeadingHttpStatus(trimmed);
+  const candidate = leading ? trimmed : stripErrorPrefix(trimmed);
+  const body = leading ? leading.rest : (extractLeadingHttpStatus(candidate)?.rest ?? candidate);
+  if (!HTML_BODY_RE.test(body) || !HTML_CLOSE_RE.test(body)) {
+    return false;
+  }
+  // When a status is available, keep the existing >= 400 guard so a sub-400
+  // status-prefixed payload is not flagged. When no status can be inferred,
+  // trust the strong HTML markers: upstream CDNs sometimes surface raw HTML
+  // without a leading status prefix, and falling through would misclassify
+  // them as DNS/transport failures downstream.
   const inferred =
     typeof status === "number" && Number.isFinite(status)
       ? status
-      : extractLeadingHttpStatus(candidate)?.code;
-  if (typeof inferred !== "number" || inferred < 400) {
+      : (leading?.code ?? extractLeadingHttpStatus(candidate)?.code);
+  if (typeof inferred === "number" && inferred < 400) {
     return false;
   }
-  const rest = extractLeadingHttpStatus(candidate)?.rest ?? candidate;
-  return HTML_BODY_RE.test(rest) && HTML_CLOSE_RE.test(rest);
+  return true;
 }
 
 function isTransportHtmlErrorStatus(status: number | undefined): boolean {

@@ -290,6 +290,23 @@ describe("formatAssistantErrorText", () => {
     );
   });
 
+  it("returns the upstream-HTML message for openai-codex HTML pages without a leading HTTP status (#67712)", () => {
+    // Cloudflare challenge bodies often mention DNS in body copy. Before the fix,
+    // isHtmlErrorResponse required an inferrable status and bailed to
+    // isDnsTransportErrorMessage, producing "DNS lookup for the provider endpoint failed".
+    const rawHtml =
+      "<!doctype html><html><head><title>Just a moment...</title></head>" +
+      "<body><h1>Checking your browser...</h1>" +
+      "<p>The owner of this website has configured DNS routing that requires verification.</p>" +
+      "</body></html>";
+    const msg = makeAssistantError(rawHtml);
+    expect(formatAssistantErrorText(msg, { provider: "openai-codex" })).toBe(
+      "The provider returned an HTML error page instead of an API response. " +
+        "This usually means a CDN or gateway (e.g. Cloudflare) blocked the request. " +
+        "Retry in a moment or check provider status.",
+    );
+  });
+
   it("returns a proxy-specific message for proxy misroutes", () => {
     const msg = makeAssistantError("407 Proxy Authentication Required");
     expect(formatAssistantErrorText(msg)).toBe(

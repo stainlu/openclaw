@@ -230,3 +230,46 @@ describe("Cloudflare / CDN HTML error page classification (#67517)", () => {
     expect(classifyFailoverReason(jsonRateLimit)).toBe("rate_limit");
   });
 });
+
+describe("Raw HTML error pages without a leading HTTP status (#67712)", () => {
+  const rawHtmlChallenge =
+    "<!doctype html><html><head><title>Just a moment...</title></head>" +
+    "<body><h1>Checking your browser...</h1>" +
+    "<p>The owner of this website has configured DNS routing that requires verification.</p>" +
+    "</body></html>";
+  const rawHtmlServerError =
+    "<html><head><title>Bad Gateway</title></head>" +
+    "<body><h1>502 Bad Gateway</h1><p>cloudflare</p></body></html>";
+  const errorPrefixedRawHtml = `Error: ${rawHtmlServerError}`;
+
+  it("classifies raw Cloudflare challenge HTML as upstream_html without a status prefix", () => {
+    expect(classifyProviderRuntimeFailureKind({ message: rawHtmlChallenge })).toBe("upstream_html");
+  });
+
+  it("prefers upstream_html over dns even when HTML body mentions DNS", () => {
+    // Regression: openai-codex/Cloudflare HTML challenge pages frequently reference DNS.
+    // Previously this fell through isHtmlErrorResponse (status-less) into isDnsTransportErrorMessage
+    // (substring match on 'dns') and produced "DNS lookup failed" user copy.
+    expect(classifyProviderRuntimeFailureKind({ message: rawHtmlChallenge })).not.toBe("dns");
+  });
+
+  it("classifies raw HTML as upstream_html even when stripped of the Error: prefix", () => {
+    expect(classifyProviderRuntimeFailureKind({ message: errorPrefixedRawHtml })).toBe(
+      "upstream_html",
+    );
+  });
+
+  it("does not misclassify plain DNS transport errors as HTML", () => {
+    expect(
+      classifyProviderRuntimeFailureKind({
+        message: "dial tcp: lookup api.openai.com: no such host (ENOTFOUND)",
+      }),
+    ).toBe("dns");
+  });
+
+  it("still rejects HTML-looking bodies when an explicit sub-400 status is provided", () => {
+    expect(
+      classifyProviderRuntimeFailureKind({ status: 200, message: rawHtmlServerError }),
+    ).not.toBe("upstream_html");
+  });
+});
