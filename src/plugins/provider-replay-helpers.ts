@@ -123,7 +123,6 @@ export function buildHybridAnthropicOrOpenAIReplayPolicy(
         options.anthropicModelDropThinkingBlocks &&
         isClaude &&
         !shouldPreserveThinkingBlocks(ctx.modelId),
-      preserveNativeAnthropicToolUseIds: true,
     });
   }
 

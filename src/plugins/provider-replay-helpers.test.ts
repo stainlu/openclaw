@@ -93,7 +93,6 @@ describe("provider replay helpers", () => {
   });
 
   it("builds hybrid anthropic or openai replay policy", () => {
-    // Sonnet 4.6 preserves thinking blocks even when flag is set
     const sonnet46Policy = buildHybridAnthropicOrOpenAIReplayPolicy(
       {
         provider: "minimax",
@@ -104,11 +103,9 @@ describe("provider replay helpers", () => {
     );
     expect(sonnet46Policy).toMatchObject({
       validateAnthropicTurns: true,
-      preserveNativeAnthropicToolUseIds: true,
     });
     expect(sonnet46Policy).not.toHaveProperty("dropThinkingBlocks");
 
-    // Legacy model still drops thinking but preserves native tool IDs
     expect(
       buildHybridAnthropicOrOpenAIReplayPolicy(
         {
@@ -121,19 +118,6 @@ describe("provider replay helpers", () => {
     ).toMatchObject({
       validateAnthropicTurns: true,
       dropThinkingBlocks: true,
-      preserveNativeAnthropicToolUseIds: true,
-    });
-
-    // MiniMax native model via anthropic-messages also preserves tool IDs
-    expect(
-      buildHybridAnthropicOrOpenAIReplayPolicy({
-        provider: "minimax",
-        modelApi: "anthropic-messages",
-        modelId: "MiniMax-M2.7",
-      } as never),
-    ).toMatchObject({
-      sanitizeToolCallIds: true,
-      preserveNativeAnthropicToolUseIds: true,
     });
 
     expect(
