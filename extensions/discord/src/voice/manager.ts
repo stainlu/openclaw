@@ -18,6 +18,7 @@ import { parseTtsDirectives } from "openclaw/plugin-sdk/speech";
 import { formatErrorMessage } from "openclaw/plugin-sdk/ssrf-runtime";
 import { resolvePreferredOpenClawTmpDir } from "openclaw/plugin-sdk/temp-path";
 import { normalizeOptionalString } from "openclaw/plugin-sdk/text-runtime";
+import { getTtsProvider, resolveTtsPrefsPath } from "openclaw/plugin-sdk/tts-runtime";
 import { formatMention } from "../mentions.js";
 import { normalizeDiscordSlug, resolveDiscordOwnerAccess } from "../monitor/allow-list.js";
 import { formatDiscordUserTag } from "../monitor/format.js";
@@ -809,6 +810,7 @@ export class DiscordVoiceManager {
     const directive = parseTtsDirectives(replyText, ttsConfig.modelOverrides, {
       cfg: ttsCfg,
       providerConfigs: ttsConfig.providerConfigs,
+      preferredProviderId: getTtsProvider(ttsConfig, resolveTtsPrefsPath(ttsConfig)),
     });
     const rawSpeakText = directive.overrides.ttsText ?? directive.cleanedText.trim();
     const speakText = sanitizeVoiceReplyTextForSpeech(rawSpeakText, speaker.label);

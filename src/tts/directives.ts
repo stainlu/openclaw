@@ -13,6 +13,7 @@ type ParseTtsDirectiveOptions = {
   cfg?: OpenClawConfig;
   providers?: readonly SpeechProviderPlugin[];
   providerConfigs?: Record<string, SpeechProviderConfig>;
+  preferredProviderId?: string;
 };
 
 function buildProviderOrder(left: SpeechProviderPlugin, right: SpeechProviderPlugin): number {
@@ -36,6 +37,20 @@ function resolveDirectiveProviderConfig(
   options?: ParseTtsDirectiveOptions,
 ): SpeechProviderConfig | undefined {
   return options?.providerConfigs?.[provider.id];
+}
+
+function prioritizeProvider(
+  providers: readonly SpeechProviderPlugin[],
+  providerId: string | undefined,
+): SpeechProviderPlugin[] {
+  if (!providerId) {
+    return [...providers];
+  }
+  const preferredProvider = providers.find((provider) => provider.id === providerId);
+  if (!preferredProvider) {
+    return [...providers];
+  }
+  return [preferredProvider, ...providers.filter((provider) => provider.id !== providerId)];
 }
 
 export function parseTtsDirectives(
@@ -67,12 +82,6 @@ export function parseTtsDirectives(
     hasDirective = true;
     const tokens = body.split(/\s+/).filter(Boolean);
 
-    // Pre-scan for `provider=X` so generic-token routing below can prefer the
-    // user-declared provider. Without this, multiple plugins that claim the
-    // same generic token (e.g. `speed`) are resolved in autoSelectOrder and the
-    // first-match wins regardless of whether the user named a different
-    // provider. Last-wins semantics match the legacy behavior for
-    // `overrides.provider` and its warnings.
     let declaredProviderId: string | undefined;
     if (policy.allowProvider) {
       for (const token of tokens) {
@@ -89,21 +98,19 @@ export function parseTtsDirectives(
           continue;
         }
         const providerId = normalizeLowercaseStringOrEmpty(rawValue);
-        if (providerId) {
-          declaredProviderId = providerId;
-          overrides.provider = providerId;
-        } else {
+        if (!providerId) {
           warnings.push("invalid provider id");
+          continue;
         }
+        declaredProviderId = providerId;
+        overrides.provider = providerId;
       }
     }
 
-    const orderedProviders = declaredProviderId
-      ? [
-          ...providers.filter((p) => p.id === declaredProviderId),
-          ...providers.filter((p) => p.id !== declaredProviderId),
-        ]
-      : providers;
+    const orderedProviders = prioritizeProvider(
+      providers,
+      declaredProviderId ?? normalizeLowercaseStringOrEmpty(options?.preferredProviderId),
+    );
 
     for (const token of tokens) {
       const eqIndex = token.indexOf("=");
