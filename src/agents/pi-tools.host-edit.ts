@@ -1,6 +1,6 @@
 import path from "node:path";
 import type { AgentToolResult, AgentToolUpdateCallback } from "@mariozechner/pi-agent-core";
-import { expandHomePrefix } from "../infra/home-dir.js";
+import { expandHomePrefix, resolveOsHomeDir } from "../infra/home-dir.js";
 import { getToolParamsRecord } from "./pi-tools.params.js";
 import type { AnyAgentTool } from "./pi-tools.types.js";
 
@@ -23,7 +23,8 @@ const EDIT_MISMATCH_MESSAGE = "Could not find the exact text in";
 const EDIT_MISMATCH_HINT_LIMIT = 800;
 
 function resolveEditPath(root: string, pathParam: string): string {
-  const expanded = expandHomePrefix(pathParam);
+  const home = resolveOsHomeDir();
+  const expanded = home ? expandHomePrefix(pathParam, { home }) : pathParam;
   return path.isAbsolute(expanded) ? path.resolve(expanded) : path.resolve(root, expanded);
 }
 
