@@ -28,6 +28,15 @@ export function resolveNestedAgentLane(lane?: string): string {
  * step follow-ups, ACP Claude Code runs) through a single global `nested`
  * queue with `maxConcurrent=1`. A single long ACP run on one session could
  * starve every other agent's nested work across the gateway (#67502).
+ *
+ * Lane lifecycle: per-session lanes follow the same pattern as the existing
+ * `session:<key>` lanes (see `src/agents/pi-embedded-runner/lanes.ts`). Lane
+ * state in `src/process/command-queue.ts` persists for the gateway process
+ * lifetime in its `Map<string, LaneState>` and is never actively reaped, so
+ * each distinct session key minted here contributes one long-lived entry
+ * (~200 bytes). This matches existing per-session lane behaviour and has
+ * not been a problem in practice; an idle-lane reaper would be a clean
+ * follow-up but is intentionally out of scope here.
  */
 export function resolveNestedAgentLaneForSession(sessionKey: string | undefined): string {
   const trimmed = sessionKey?.trim();
