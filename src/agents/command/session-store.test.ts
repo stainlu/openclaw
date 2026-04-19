@@ -277,7 +277,6 @@ describe("updateSessionStoreAfterAgentRun", () => {
       const sessionKey = "agent:main:explicit:test-no-usage";
       const sessionId = "test-session";
 
-      // Session already has totalTokens from a prior run or compaction.
       const sessionStore: Record<string, SessionEntry> = {
         [sessionKey]: {
           sessionId,
@@ -288,7 +287,6 @@ describe("updateSessionStoreAfterAgentRun", () => {
       };
       await fs.writeFile(storePath, JSON.stringify(sessionStore, null, 2));
 
-      // Provider returns no usage data (e.g., MiniMax Anthropic endpoint).
       const result: EmbeddedPiRunResult = {
         meta: {
           durationMs: 500,
@@ -311,9 +309,7 @@ describe("updateSessionStoreAfterAgentRun", () => {
         result,
       });
 
-      // totalTokens should be preserved (not reset to undefined).
       expect(sessionStore[sessionKey]?.totalTokens).toBe(21225);
-      // Marked stale since it's from a prior run, not this one.
       expect(sessionStore[sessionKey]?.totalTokensFresh).toBe(false);
 
       const persisted = loadSessionStore(storePath);

@@ -139,9 +139,6 @@ export async function updateSessionStoreAfterAgentRun(params: {
     Number.isFinite(entry.totalTokens) &&
     entry.totalTokens > 0
   ) {
-    // Provider did not return usage data for this run. Preserve the last
-    // known totalTokens (from a prior run or compaction) so /status doesn't
-    // reset to 0%. Mark as stale so display layers know it's not from this turn.
     next.totalTokens = entry.totalTokens;
     next.totalTokensFresh = false;
   }
