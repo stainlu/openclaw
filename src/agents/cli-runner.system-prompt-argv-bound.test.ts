@@ -114,6 +114,11 @@ describe("claude-cli system prompt argv length bound (#71600)", () => {
 
     await executePreparedCliRun(buildLargeSystemPromptContext(largeSystemPrompt));
 
+    // Pin that the spawn was actually reached so the inside-mock capture
+    // is meaningful. Otherwise capturedArgv stays [] and the assertions
+    // below would pass under "mock never ran" instead of "argv stayed
+    // bounded".
+    expect(supervisorSpawnMock).toHaveBeenCalledTimes(1);
     expect(capturedArgv.length).toBeGreaterThan(0);
     expect(joinedArgvLength(capturedArgv)).toBeLessThan(WINDOWS_COMMAND_LINE_LIMIT);
 
@@ -150,6 +155,12 @@ describe("claude-cli system prompt argv length bound (#71600)", () => {
     });
 
     await executePreparedCliRun(buildLargeSystemPromptContext(largeSystemPrompt));
+
+    // Make the inside-mock assertions meaningful: if the supervisor was
+    // never reached, the inside-mock expects above never run, systemPromptPath
+    // stays "", and `fs.access("")` rejects for a different reason — the
+    // test would pass for the wrong reason.
+    expect(supervisorSpawnMock).toHaveBeenCalledTimes(1);
 
     // Temp file is cleaned up after the run.
     await expect(fs.access(systemPromptPath)).rejects.toMatchObject({ code: "ENOENT" });
