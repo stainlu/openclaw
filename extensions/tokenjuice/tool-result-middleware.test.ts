@@ -42,6 +42,20 @@ const baseResult: OpenClawAgentToolResult = {
   details: { status: "success", rawBytes: 64 },
 };
 
+function createTextUpdate(text: string, details?: unknown): Partial<OpenClawAgentToolResult> {
+  return {
+    content: [{ type: "text", text }],
+    ...(details === undefined ? {} : { details }),
+  };
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return {};
+}
+
 function createEvent(
   overrides: Partial<AgentToolResultMiddlewareEvent> = {},
 ): AgentToolResultMiddlewareEvent {
@@ -73,19 +87,15 @@ describe("tokenjuice tool result middleware adapter", () => {
   });
 
   it("chains tokenjuice handlers with the latest content and details", async () => {
-    const first = vi.fn(() => ({
-      content: [{ type: "text", text: "compacted once" }],
-      details: { status: "success", reducer: "first" },
-    }));
-    const second = vi.fn((event) => ({
-      content: [
-        {
-          type: "text",
-          text: `${event.content[0]?.type === "text" ? event.content[0].text : ""} then twice`,
-        },
-      ],
-      details: { ...event.details, reducer: "second" },
-    }));
+    const first = vi.fn(() =>
+      createTextUpdate("compacted once", { status: "success", reducer: "first" }),
+    );
+    const second = vi.fn((event: Parameters<TokenjuiceToolResultHandler>[0]) =>
+      createTextUpdate(
+        `${event.content[0]?.type === "text" ? event.content[0].text : ""} then twice`,
+        { ...asRecord(event.details), reducer: "second" },
+      ),
+    );
     handlers.push(first, second);
 
     const middleware = createTokenjuiceAgentToolResultMiddleware();
@@ -119,9 +129,7 @@ describe("tokenjuice tool result middleware adapter", () => {
   });
 
   it("preserves previous fields when a tokenjuice handler returns a partial update", async () => {
-    handlers.push(() => ({
-      content: [{ type: "text", text: "compacted" }],
-    }));
+    handlers.push(() => createTextUpdate("compacted"));
 
     const middleware = createTokenjuiceAgentToolResultMiddleware();
 
