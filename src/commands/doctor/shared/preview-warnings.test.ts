@@ -650,6 +650,82 @@ describe("doctor preview warnings", () => {
     expect(warnings.join("\n")).not.toContain("commander");
   });
 
+  it("skips the default-agent warning when a Telegram route-derived account is fully covered", () => {
+    const warnings = collectChannelBoundMessageToolPolicyWarnings({
+      channels: {
+        telegram: {},
+      },
+      agents: {
+        list: [
+          {
+            id: "main",
+            default: true,
+            tools: {
+              allow: ["read"],
+            },
+          },
+          {
+            id: "work-agent",
+            tools: {
+              profile: "messaging",
+            },
+          },
+        ],
+      },
+      bindings: [
+        {
+          agentId: "work-agent",
+          match: {
+            channel: "telegram",
+            accountId: "work",
+          },
+        },
+      ],
+    });
+
+    expect(warnings).toStrictEqual([]);
+  });
+
+  it("warns for default-routed Telegram traffic when a route-derived account is only peer-scoped", () => {
+    const warnings = collectChannelBoundMessageToolPolicyWarnings({
+      channels: {
+        telegram: {},
+      },
+      agents: {
+        list: [
+          {
+            id: "main",
+            default: true,
+            tools: {
+              allow: ["read"],
+            },
+          },
+          {
+            id: "work-agent",
+            tools: {
+              profile: "messaging",
+            },
+          },
+        ],
+      },
+      bindings: [
+        {
+          agentId: "work-agent",
+          match: {
+            channel: "telegram",
+            accountId: "work",
+            peer: { kind: "direct", id: "123" },
+          },
+        },
+      ],
+    });
+
+    expect(warnings).toEqual([
+      expect.stringContaining('Agent "main" is routed from channel "telegram"'),
+    ]);
+    expect(warnings.join("\n")).not.toContain("work-agent");
+  });
+
   it("skips the default-agent warning when a wildcard account route covers the channel", () => {
     const warnings = collectChannelBoundMessageToolPolicyWarnings({
       channels: {

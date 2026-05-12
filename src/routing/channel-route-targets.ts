@@ -1,5 +1,6 @@
 import { normalizeChatChannelId } from "../channels/ids.js";
 import { listRouteBindings } from "../config/bindings.js";
+import type { AgentRouteBinding } from "../config/types.agents.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { normalizeLowercaseStringOrEmpty } from "../shared/string-coerce.js";
 import { resolveAgentRoute } from "./resolve-route.js";
@@ -11,6 +12,7 @@ export type ChannelRouteTarget = {
 };
 
 const CHANNELS_CONFIG_META_KEYS = new Set(["defaults", "modelByChannel"]);
+const ROUTE_DERIVED_ACCOUNT_CHANNEL_IDS = new Set(["telegram"]);
 
 function hasRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -57,6 +59,27 @@ function listConfiguredChannelAccountIds(cfg: OpenClawConfig, channelId: string)
     .toSorted();
 }
 
+function listRouteDerivedChannelAccountIds(
+  routeBindings: readonly AgentRouteBinding[],
+  channelId: string,
+): string[] {
+  if (!ROUTE_DERIVED_ACCOUNT_CHANNEL_IDS.has(channelId)) {
+    return [];
+  }
+  const accountIds = new Set<string>();
+  for (const binding of routeBindings) {
+    if (normalizeRouteBindingChannelKey(binding.match.channel) !== channelId) {
+      continue;
+    }
+    const accountId = binding.match.accountId?.trim();
+    if (!accountId || accountId === "*") {
+      continue;
+    }
+    accountIds.add(normalizeAccountId(accountId));
+  }
+  return Array.from(accountIds).toSorted();
+}
+
 function addTarget(byAgent: Map<string, Set<string>>, agentId: string, channel: string): void {
   const normalizedAgentId = normalizeAgentId(agentId);
   const trimmedChannel = channel.trim();
@@ -70,14 +93,22 @@ function addTarget(byAgent: Map<string, Set<string>>, agentId: string, channel: 
 
 export function collectChannelRouteTargets(cfg: OpenClawConfig): ChannelRouteTarget[] {
   const byAgent = new Map<string, Set<string>>();
+  const routeBindings = listRouteBindings(cfg);
 
-  for (const binding of listRouteBindings(cfg)) {
+  for (const binding of routeBindings) {
     addTarget(byAgent, binding.agentId, normalizeRouteBindingChannelKey(binding.match.channel));
   }
 
   for (const channel of listConfiguredChannelIds(cfg)) {
     const accountIds = listConfiguredChannelAccountIds(cfg, channel);
-    const sampledAccountIds = accountIds.length > 0 ? accountIds : [DEFAULT_ACCOUNT_ID];
+    const routeDerivedAccountIds =
+      accountIds.length === 0 ? listRouteDerivedChannelAccountIds(routeBindings, channel) : [];
+    const sampledAccountIds =
+      accountIds.length > 0
+        ? accountIds
+        : routeDerivedAccountIds.length > 0
+          ? routeDerivedAccountIds
+          : [DEFAULT_ACCOUNT_ID];
     for (const accountId of sampledAccountIds) {
       const route = resolveAgentRoute({
         cfg,
